@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Determinism Quiz</title>
+  <style>
+    :root {
+      --bg-color: #0f1117;
+      --card-bg: #181a20;
+      --card-inner: #21242d;
+      --accent-blue: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --correct-green: #10b981;
+      --incorrect-red: #ef4444;
+      --border-color: #2b303c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Matrix canvas animation */
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .main-title {
+      position: relative;
+      z-index: 1;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+      text-align: center;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .quiz-card {
+      position: relative;
+      z-index: 1;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      max-width: 680px;
+      width: 100%;
+      padding: 32px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    }
+
+    .quiz-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .header-left, .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .music-toggle-btn {
+      background-color: var(--card-inner);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .music-toggle-btn:hover {
+      background-color: #2b303c;
+    }
+
+    .question-title {
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .option-item {
+      background-color: var(--card-inner);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    .option-item:hover:not(.locked) {
+      border-color: #4a5266;
+    }
+
+    .option-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .custom-input {
+      margin-top: 2px;
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      min-height: 18px;
+      flex-shrink: 0;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    .option-text {
+      font-size: 15px;
+      line-height: 1.4;
+      flex-grow: 1;
+    }
+
+    .badge-status {
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .badge-status.correct { color: var(--correct-green); }
+    .badge-status.incorrect { color: var(--incorrect-red); }
+
+    .explanation-text {
+      margin-top: 8px;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      background-color: rgba(255, 255, 255, 0.03);
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .option-item.correct-border {
+      border-color: var(--correct-green) !important;
+      background-color: rgba(16, 185, 129, 0.05);
+    }
+
+    .option-item.incorrect-border {
+      border-color: var(--incorrect-red) !important;
+      background-color: rgba(239, 68, 68, 0.05);
+    }
+
+    .option-item.locked { cursor: default; }
+
+    .quiz-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+    }
+
+    .left-buttons, .right-buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      background-color: var(--card-inner);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover { background-color: #2b303c; }
+
+    .btn-blue {
+      background-color: var(--accent-blue);
+      border-color: var(--accent-blue);
+      color: #fff;
+    }
+
+    .btn-blue:hover { background-color: var(--accent-hover); }
+
+    .results-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .results-score-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .results-score-title {
+      font-size: 16px;
+      color: var(--text-secondary);
+    }
+
+    .results-score-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-top: 4px;
+    }
+
+    .language-select {
+      background-color: var(--card-inner);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .language-select:hover {
+      background-color: #2b303c;
+    }
+
+    .language-select option {
+      background-color: var(--card-bg);
+      color: var(--text-primary);
+    }
+
+    .progress-bar-container {
+      height: 12px;
+      width: 100%;
+      background-color: var(--card-inner);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      margin: 12px 0;
+    }
+
+    .bar-segment {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .bar-correct { background-color: var(--accent-blue); }
+    .bar-incorrect { background-color: var(--incorrect-red); }
+    .bar-skipped { background-color: #4b5563; }
+
+    .stats-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .dot.blue { background-color: var(--accent-blue); }
+    .dot.red { background-color: var(--incorrect-red); }
+    .dot.gray { background-color: #4b5563; }
+
+    .questions-summary-list {
+      max-height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 6px;
+    }
+
+    .questions-summary-item {
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.4;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .bottom-box {
+      margin-top: 10px;
+      background-color: var(--card-inner);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .determinism-info {
+      background-color: var(--card-inner);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 22px;
+      margin-top: 10px;
+      line-height: 1.6;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .determinism-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .determinism-info h3 {
+      color: var(--text-primary);
+      font-size: 17px;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .speech-btn {
+      background-color: var(--accent-blue);
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .speech-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .determinism-info p {
+      margin-bottom: 12px;
+    }
+
+    .determinism-info p:last-child {
+      margin-bottom: 0;
+    }
+
+    .sequence-block {
+      background-color: rgba(59, 130, 246, 0.05);
+      border-left: 3px solid var(--accent-blue);
+      padding: 10px 14px;
+      margin: 14px 0;
+      color: var(--text-primary);
+      font-weight: 500;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .author-credits {
+      text-align: center;
+      margin-top: 20px;
+      padding-top: 10px;
+    }
+
+    .author-credits a {
+      color: #525866;
+      font-size: 12px;
+      text-decoration: none;
+      letter-spacing: 0.5px;
+      transition: color 0.2s ease;
+    }
+
+    .author-credits a:hover {
+      color: var(--accent-blue);
+    }
+  </style>
+</head>
+<body>
+
+<!-- BACKGROUND MUSIC AUDIO -->
+<audio id="bg-music" loop preload="auto">
+  <source src="music.mp3" type="audio/mpeg">
+</audio>
+
+<!-- ESSAY VOICE-OVER AUDIO -->
+<audio id="text-speech-audio" preload="auto">
+  <source src="text-audio-en.mp3" type="audio/mpeg">
+</audio>
+
+<canvas id="matrix-canvas"></canvas>
+
+<h1 class="main-title">Determinism Quiz</h1>
+
+<div class="quiz-card" id="quiz-card"></div>
+
+<script>
+  // --- LANGUAGE SELECTOR LINKS ---
+  const languageLinks = {
+    ru: "https://your-domain.com/ru",
+    en: "https://your-domain.com/en"
+  };
+
+  function openLanguageLink(selectElement) {
+    const selectedLang = selectElement.value;
+    if (languageLinks[selectedLang]) {
+      window.open(languageLinks[selectedLang], '_blank');
+    }
+  }
+
+  // --- MATRIX CANVAS ANIMATION ---
+  const canvas = document.getElementById('matrix-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789日ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘｱﾎﾃﾏｹﾒｴｶｷﾑﾕﾗｾﾈｽﾀﾇﾍ';
+  const fontSize = 14;
+  let columns = Math.floor(canvas.width / fontSize);
+  let drops = Array(columns).fill(1);
+
+  function drawMatrix() {
+    ctx.fillStyle = 'rgba(15, 17, 23, 0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = `${fontSize}px monospace`;
+
+    for (let i = 0; i < drops.length; i++) {
+      const text = characters.charAt(Math.floor(Math.random() * characters.length));
+      const opacity = Math.random() * 0.4 + 0.1; 
+      ctx.fillStyle = `rgba(200, 205, 215, ${opacity})`;
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+      if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+      drops[i]++;
+    }
+  }
+
+  setInterval(drawMatrix, 50);
+
+  // --- QUIZ DATA ---
+  const quizData = [
+    {
+      type: "single",
+      question: "Imagine: you are sitting down and suddenly decide to stand up and drink some water. Why does it feel like this thought came completely 'out of nowhere'?",
+      options: [
+        { text: "A. Because your brain erased all memory a second before you felt thirsty.", explanation: "Memory has nothing to do with it. You remember where the glass and the tap are, so past experience is fully active." },
+        { text: "B. Our consciousness only registers the final thought ('I want to drink!'), while we don't feel the body's hidden processes (thirst, dry air, fatigue).", explanation: "Correct! Your body required water, your brain performed massive background work, and served you a ready conclusion: 'Go drink.' It feels like magic simply because we don't feel our body's internal chemistry.", correct: true },
+        { text: "C. At that exact moment, the person completely disconnected from the external world.", explanation: "On the contrary, the room might have gotten warm or you saw a glass on the table — the external environment prompted the decision." },
+        { text: "D. It is a completely random spark in your head that has no connection to your body.", explanation: "If it were random, you would be equally likely to feel like eating soap or jumping out the window. But your brain delivered a logical solution to physical needs." }
+      ]
+    },
+    {
+      type: "single",
+      question: "What is the key difference between 'everything is predetermined by fate' and 'everything has its causes'?",
+      options: [
+        { text: "A. Fate claims your actions change nothing. The law of cause shows: your actions ARE the cause of the future!", explanation: "Correct! 'Fate' assumes that if you are destined to fall, you will fall no matter what. Causal relations state: if you look where you step and tie your shoelaces (cause), you will not fall (effect). Your actions actively shape everything!", correct: true },
+        { text: "B. Believing in fate grants free choice, while the law of cause strips it away.", explanation: "On the contrary. Fate asserts that the choice has already been made for you from above." },
+        { text: "C. The law of cause states that events happen randomly.", explanation: "No, causality proves that every event has a specific, logical preceding history." },
+        { text: "D. They are exactly the same thing, just phrased differently.", explanation: "They are fundamentally different: fate renders a human helpless, whereas understanding causes provides a tool to transform your life." }
+      ]
+    },
+    {
+      type: "single",
+      question: "You browsed a marketplace and unexpectedly bought some useless item. What is the logical flaw in thinking: 'I don't know why I bought this, so my purchase had no cause'?",
+      options: [
+        { text: "A. If you don't know the cause, it means there really isn't one.", explanation: "Not knowing how a car engine works doesn't mean the car runs on magic." },
+        { text: "B. You are confusing 'I don't know the cause' with 'no cause exists'. The cause was there (fatigue, bright ad, boredom), you just failed to consciously register it.", explanation: "Correct! A cause was almost certainly present: you were tired after work, a striking banner triggered a dopamine hit, or it evoked a childhood memory. You simply didn't catch the impulse in time.", correct: true },
+        { text: "C. The mistake is assuming purchases are made by the brain rather than the soul.", explanation: "All our decisions are physiological processes and brain responses to stimuli." },
+        { text: "D. Purchases always happen completely randomly, like a coin toss.", explanation: "Marketers earn billions precisely because purchases are NOT random, but calculated through psychological triggers." }
+      ]
+    },
+    {
+      type: "multiple",
+      question: "Which of the following genuinely belong to the closed loop of human-environment interaction? (Select multiple)",
+      options: [
+        { text: "A. Receiving information (seeing a delicious dessert in a shop display).", explanation: "Yes! Your eyes see the image and send signals to the brain — this is the first link.", correct: true },
+        { text: "B. Body's response and decision making (salivation starts, brain craves sweets).", explanation: "Yes! The brain processes input and generates a desire — this is the second link.", correct: true },
+        { text: "C. Action and modifying the environment (you bought the dessert and ate it).", explanation: "Yes! You took action, the pastry vanished, the display window changed — this is the third link.", correct: true },
+        { text: "D. The brain disconnecting entirely from the laws of physics at the moment of choice.", explanation: "No, the brain never escapes the physical world for a microsecond and continues operating by natural laws.", correct: false }
+      ]
+    },
+    {
+      type: "single",
+      question: "Imagine a coin tossed that lands 'heads' randomly. If our brains experience microscopic random glitches as well, does that make us free and conscious?",
+      options: [
+        { text: "A. Yes, randomness is what true free will is made of.", explanation: "If your hand twitches randomly and breaks a cup, would you consider that a 'conscious free choice'?" },
+        { text: "B. No. If a decision occurred randomly (like a coin toss), you control it no more than a reflex or habit.", explanation: "Correct! Random chaos is not conscious choice. Blurted nonsense isn't 'free will', just a system error.", correct: true },
+        { text: "C. Yes, because randomness proves no one is controlling us.", explanation: "Absence of external control does not imply a conscious 'master' emerged. You still lack control over randomness." },
+        { text: "D. Randomness turns a person into a passive inanimate stone.", explanation: "It doesn't. A human remains a complex living system even if probabilities exist within." }
+      ]
+    },
+    {
+      type: "single",
+      question: "Why do we need traffic rules, laws, and fines if human behavior is driven by causes and the brain?",
+      options: [
+        { text: "A. The knowledge of a fine or penalty itself becomes a powerful cause that deters the brain from violating rules.", explanation: "Correct! When a driver knows a speed camera is ahead (new information = cause), their brain presses the brake pedal (effect). Rules physically alter behavior!", correct: true },
+        { text: "B. Laws are meaningless because people only do whatever they want anyway.", explanation: "Laws are deeply effective — they drastically reduce crime and accident rates." },
+        { text: "C. Laws only work if they erase people's memory.", explanation: "Laws rely on human memory rather than erasing it." },
+        { text: "D. Fines exist solely to confuse people.", explanation: "Fines are an informational tool for directing mass human behavior." }
+      ]
+    },
+    {
+      type: "multiple",
+      question: "How can a person actually reshape their habits and change future behavior? (Select multiple)",
+      options: [
+        { text: "A. Change incoming information (stop consuming toxic content, start reading books).", explanation: "Yes! New information forms new neural connections and changes how the brain reasons tomorrow.", correct: true },
+        { text: "B. Alter the environment (remove snacks and phone from your desk).", explanation: "Yes! Without a trigger (cause), the brain won't get distracted or waste energy fighting temptation.", correct: true },
+        { text: "C. Simply grit your teeth and 'will yourself' to be different without changing surroundings.", explanation: "No! Pure willpower quickly depletes if your environment, triggers, and conditions stay identical.", correct: false },
+        { text: "D. Shift your social circle toward people with healthy habits.", explanation: "Yes! Environment is one of the strongest factors your brain automatically adapts to.", correct: true }
+      ]
+    },
+    {
+      type: "single",
+      question: "What is happening inside someone's head at the moment they say: 'I decided to go to university'?",
+      options: [
+        { text: "A. The brain processed accumulated experience, assessments, desires, weighed pros and cons, and issued an action command.", explanation: "Correct! The phrase 'I decided' is a human label for complex brain processing of experience to select the optimal path.", correct: true },
+        { text: "B. The thought arose out of total void, without relying on any past knowledge.", explanation: "If past knowledge weren't used, the person couldn't even choose where to apply." },
+        { text: "C. The person passively watched their legs walk over to submit documents.", explanation: "A human is not a passive spectator; the brain is an active participant and control center." },
+        { text: "D. It is all an illusion; studying will not alter a person's life.", explanation: "New knowledge directly alters qualifications, actions, and future prospects." }
+      ]
+    },
+    {
+      type: "single",
+      question: "Two people missed the bus. One threw a tantrum and ruined their day, while the other smiled and went to grab coffee. Why the different reaction?",
+      options: [
+        { text: "A. One knows how to step outside the physical world, while the other does not.", explanation: "Both individuals live in the exact same physical world." },
+        { text: "B. They have different internal 'configurations': different past experience, fatigue levels, mindsets, and stress tolerance.", explanation: "Correct! The input signal was identical (bus left), but processed by two different 'computers' with distinct software and history. Thus, outputs differed.", correct: true },
+        { text: "C. The second person's reaction was entirely random and uncaused.", explanation: "The second person reacted that way because they slept well or learned positive reframing." },
+        { text: "D. It's strictly about genetics; upbringing plays no role.", explanation: "Upbringing, habits, and mindset dramatically alter how we respond to stress." }
+      ]
+    },
+    {
+      type: "single",
+      question: "What is the single most valuable conclusion to draw from all of this?",
+      options: [
+        { text: "A. Stop trying to 'force yourself to be a new person' out of nowhere. Instead, change your environment and incoming information — then your brain will naturally act differently!", explanation: "Exactly! If you want to study or get fit, relying on raw desire is inefficient. Remove distractions, feed quality information, optimize conditions — and your brain will produce the desired actions naturally!", correct: true },
+        { text: "B. You might as well do nothing, since the brain decides everything anyway.", explanation: "This is a fatalistic fallacy. Your actions today are precisely what shapes your brain for tomorrow." },
+        { text: "C. Stop reading books and learning.", explanation: "On the contrary! New books and learning are the best way to load quality 'software' into your brain." },
+        { text: "D. Humans have zero influence over their future.", explanation: "Humans profoundly influence their future — by consciously constructing their present!" }
+      ]
+    }
+  ];
+
+  let currentQuestion = 0;
+  let selectedAnswers = {};
+  let isCheckedState = {};
+  let showExplanation = true;
+  let isMusicPlaying = false;
+  let isSpeechPlaying = false;
+
+  function renderQuiz() {
+    const quizCard = document.getElementById("quiz-card");
+
+    if (currentQuestion >= quizData.length) {
+      renderResults(quizCard);
+      return;
+    }
+
+    const q = quizData[currentQuestion];
+    const isChecked = isCheckedState[currentQuestion] || false;
+    const userSelections = selectedAnswers[currentQuestion] || [];
+
+    let optionsHtml = "";
+    q.options.forEach((opt, idx) => {
+      const isSelected = userSelections.includes(idx);
+      const inputType = q.type === "single" ? "radio" : "checkbox";
+
+      let borderClass = "";
+      let badgeHtml = "";
+      let explanationHtml = "";
+
+      if (isChecked) {
+        if (opt.correct) {
+          borderClass = "correct-border";
+          badgeHtml = `<div class="badge-status correct">✓ ${q.type === 'multiple' ? 'Correct Option' : 'Correct!'}</div>`;
+        } else if (isSelected && !opt.correct) {
+          borderClass = "incorrect-border";
+          badgeHtml = `<div class="badge-status incorrect">✕ ${q.type === 'multiple' ? 'Incorrect' : 'Incorrect'}</div>`;
+        }
+
+        if (showExplanation) {
+          explanationHtml = `<div class="explanation-text">${opt.explanation}</div>`;
+        }
+      }
+
+      optionsHtml += `
+        <div class="option-item ${borderClass} ${isChecked ? 'locked' : ''}" onclick="onOptionClick(${idx})">
+          <div class="option-header">
+            <input type="${inputType}" name="option" class="custom-input" ${isSelected ? 'checked' : ''} ${isChecked ? 'disabled' : ''}>
+            <div class="option-text">${opt.text}</div>
+          </div>
+          ${badgeHtml}
+          ${explanationHtml}
+        </div>
+      `;
+    });
+
+    quizCard.innerHTML = `
+      <div class="quiz-header">
+        <div class="header-left">
+          <button class="music-toggle-btn" onclick="toggleMusic(event)">
+            ${isMusicPlaying ? '🔊 Music: On' : '🔇 Music: Off'}
+          </button>
+          <span>Question ${currentQuestion + 1} of ${quizData.length}</span>
+        </div>
+        <div class="header-right">
+          <select class="language-select" onchange="openLanguageLink(this)">
+            <option value="ru">🌐 Рус</option>
+            <option value="en" selected>🌐 Eng</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="question-title">${q.question}</div>
+
+      <div class="options-list">
+        ${optionsHtml}
+      </div>
+
+      <div class="quiz-footer">
+        <div class="left-buttons">
+          ${isChecked ? `
+            <button class="btn" onclick="toggleExplanation()">
+              ${showExplanation ? '💬 Hide Explanation' : '💬 Explanation'}
+            </button>
+          ` : ''}
+        </div>
+        <div class="right-buttons">
+          ${currentQuestion > 0 ? `<button class="btn" onclick="prevQuestion()">Back</button>` : ''}
+          <button class="btn" onclick="goToResults()">Results</button>
+          <button class="btn btn-blue" onclick="handleNextClick()">Next</button>
+        </div>
+      </div>
+
+      <div class="author-credits">
+        <a href="https://taplink.cc/max_remaster" target="_blank" rel="noopener noreferrer">by max_remaster</a>
+      </div>
+    `;
+  }
+
+  function onOptionClick(index) {
+    if (isCheckedState[currentQuestion]) return;
+
+    const q = quizData[currentQuestion];
+    if (!selectedAnswers[currentQuestion]) {
+      selectedAnswers[currentQuestion] = [];
+    }
+
+    if (q.type === "single") {
+      selectedAnswers[currentQuestion] = [index];
+    } else {
+      const pos = selectedAnswers[currentQuestion].indexOf(index);
+      if (pos > -1) {
+        selectedAnswers[currentQuestion].splice(pos, 1);
+      } else {
+        selectedAnswers[currentQuestion].push(index);
+      }
+    }
+    renderQuiz();
+  }
+
+  function handleNextClick() {
+    const userSelections = selectedAnswers[currentQuestion] || [];
+
+    if (!isCheckedState[currentQuestion]) {
+      if (userSelections.length === 0) {
+        alert("Please select at least one answer!");
+        return;
+      }
+      isCheckedState[currentQuestion] = true;
+      renderQuiz();
+    } else {
+      currentQuestion++;
+      renderQuiz();
+    }
+  }
+
+  function prevQuestion() {
+    if (currentQuestion > 0) {
+      currentQuestion--;
+      renderQuiz();
+    }
+  }
+
+  function toggleExplanation() {
+    showExplanation = !showExplanation;
+    renderQuiz();
+  }
+
+  function goToResults() {
+    currentQuestion = quizData.length;
+    renderQuiz();
+  }
+
+  function renderResults(container) {
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let skippedCount = 0;
+
+    quizData.forEach((q, idx) => {
+      const userSel = selectedAnswers[idx] || [];
+      if (!isCheckedState[idx] && userSel.length === 0) {
+        skippedCount++;
+        return;
+      }
+
+      const correctIndices = q.options.map((opt, i) => opt.correct ? i : null).filter(i => i !== null);
+      const isCorrect = userSel.length === correctIndices.length && userSel.every(val => correctIndices.includes(val));
+
+      if (isCorrect) {
+        correctCount++;
+      } else {
+        incorrectCount++;
+      }
+    });
+
+    const percent = Math.round((correctCount / quizData.length) * 100);
+
+    const questionsListHtml = quizData.map((q, idx) => `
+      <div class="questions-summary-item">
+        ${idx + 1}. ${q.question}
+      </div>
+    `).join('');
+
+    container.innerHTML = `
+      <div class="results-container">
+        <div class="results-score-header">
+          <div>
+            <div class="results-score-title">Your Score:</div>
+            <div class="results-score-value">${correctCount}/${quizData.length} (${percent}%)</div>
+          </div>
+          
+          <select class="language-select" onchange="openLanguageLink(this)">
+            <option value="ru">🌐 Рус</option>
+            <option value="en" selected>🌐 Eng</option>
+          </select>
+        </div>
+
+        <div class="progress-bar-container">
+          <div class="bar-segment bar-correct" style="width: ${(correctCount / quizData.length) * 100}%"></div>
+          <div class="bar-segment bar-incorrect" style="width: ${(incorrectCount / quizData.length) * 100}%"></div>
+          <div class="bar-segment bar-skipped" style="width: ${(skippedCount / quizData.length) * 100}%"></div>
+        </div>
+
+        <div class="stats-legend">
+          <div class="legend-item"><span class="dot blue"></span> Correct (${correctCount})</div>
+          <div class="legend-item"><span class="dot red"></span> Incorrect (${incorrectCount})</div>
+          <div class="legend-item"><span class="dot gray"></span> Skipped (${skippedCount})</div>
+        </div>
+
+        <div class="questions-summary-list">
+          ${questionsListHtml}
+        </div>
+
+        <div class="bottom-box">
+          <span>Try again</span>
+          <button class="btn" onclick="restartQuiz()">🔄 Retake Quiz</button>
+        </div>
+
+        <div class="determinism-info">
+          <div class="determinism-header">
+            <h3>Architecture of Causality: What Shapes Your Choice</h3>
+            <button class="speech-btn" id="speech-toggle-btn" onclick="toggleSpeech()">
+              ${isSpeechPlaying ? '⏸ Pause Audio' : '🎧 Listen to Audio'}
+            </button>
+          </div>
+          <p>
+            Your choice does not originate at the moment you utter "I decided." By that point, a specific configuration of your organism already exists: its current physiological state, mood, memory, experience, formed mental models, habits, knowledge, expectations, and the surrounding context.
+          </p>
+          <p>
+            Any new stimulus enters this existing configuration. A word, an image, a person, a situation, or your own thought can activate associated memories, emotional responses, and behavioral patterns. Their interplay modifies further information processing and the probability of various actions.
+          </p>
+          <p>
+            Therefore, a decision is not a isolated event created by an independent subject. It is simply the next state of a causal system.
+          </p>
+          <p>
+            This quiz itself is part of that very system. Its questions, phrasing, sequence, visual design, and music act as inputs upon your organism. An ambiguous or even flawed formulation might trigger doubt, irritation, curiosity, or resistance. A specific word can activate a memory, a familiar association, or a habitual mode of responding. One person will notice an inaccuracy and begin searching for other errors, another won't notice it, and a third might decide the author is untrustworthy. The exact same stimulus can trigger different causal chains depending on the preexisting configuration of the organism.
+          </p>
+          <p>
+            Even visual and auditory aesthetics participate in this process. For instance, falling digital rain resembling 'The Matrix' combined with music echoing Spider-Man 3 might evoke surprise, annoyance, humor, or film nostalgia. This reaction does not arise out of thin air: it is generated by the interaction of current stimuli with your memory, experience, and internal state.
+          </p>
+          <p>
+            The same applies to the quiz results. You might agree, feel skeptical, search for flaws, or experience frustration. Every single reaction carries its own causal history.
+          </p>
+          
+          <div class="sequence-block">
+            The sequence unravels as follows:<br>
+            past experience → current state → input stimulus → interpretation → reaction → choice → new context → next reaction.
+          </div>
+
+          <p>
+            Causal determinism does not imply immutability. New information, experience, and environmental changes serve as new causes that reconfigure the system and shape its subsequent states. Even understanding your own determinism becomes a new causal factor.
+          </p>
+          <p>
+            And even this text is not outside the described system.
+          </p>
+          <p>
+            You are reading specific words, linking them with existing knowledge and experience, recognizing familiar concepts, or encountering unfamiliar phrasings. Certain statements might resonate, while others spark skepticism, interest, annoyance, or pushback. Memories, associations, and habit patterns are activated.
+          </p>
+          <p>
+            Therefore, even your reaction to this text has a causal history.
+          </p>
+          <p>
+            The text acted as an input. The input changed the state of the system. The altered state influenced subsequent perception and behavior.
+          </p>
+          <p>
+            And now your next choice will be made by a slightly different system.
+          </p>
+          <p>
+            <strong>Including right now.</strong>
+          </p>
+        </div>
+
+        <div class="author-credits">
+          <a href="https://taplink.cc/max_remaster" target="_blank" rel="noopener noreferrer">by max_remaster</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function restartQuiz() {
+    currentQuestion = 0;
+    selectedAnswers = {};
+    isCheckedState = {};
+    
+    // Stop voice-over on restart
+    const speechAudio = document.getElementById('text-speech-audio');
+    speechAudio.pause();
+    speechAudio.currentTime = 0;
+    isSpeechPlaying = false;
+
+    renderQuiz();
+  }
+
+  // --- MUSIC MANAGEMENT ---
+  const bgMusic = document.getElementById('bg-music');
+  bgMusic.volume = 0.3;
+
+  function startMusic() {
+    bgMusic.play().then(() => {
+      isMusicPlaying = true;
+      updateMusicButton();
+    }).catch(() => {
+      isMusicPlaying = false;
+      document.addEventListener('click', () => {
+        if (!isMusicPlaying) {
+          bgMusic.play();
+          isMusicPlaying = true;
+          updateMusicButton();
+        }
+      }, { once: true });
+    });
+  }
+
+  function toggleMusic(e) {
+    if (e) e.stopPropagation();
+    if (isMusicPlaying) {
+      bgMusic.pause();
+      isMusicPlaying = false;
+    } else {
+      bgMusic.play();
+      isMusicPlaying = true;
+    }
+    updateMusicButton();
+  }
+
+  function updateMusicButton() {
+    const btn = document.querySelector('.music-toggle-btn');
+    if (btn) {
+      btn.innerText = isMusicPlaying ? '🔊 Music: On' : '🔇 Music: Off';
+    }
+  }
+
+  // --- ESSAY AUDIO VOICE-OVER ---
+  function toggleSpeech() {
+    const speechAudio = document.getElementById('text-speech-audio');
+    const speechBtn = document.getElementById('speech-toggle-btn');
+
+    if (isSpeechPlaying) {
+      speechAudio.pause();
+      isSpeechPlaying = false;
+      if (speechBtn) speechBtn.innerText = '🎧 Listen to Audio';
+    } else {
+      speechAudio.play().then(() => {
+        isSpeechPlaying = true;
+        if (speechBtn) speechBtn.innerText = '⏸ Pause Audio';
+      }).catch(err => {
+        alert("Could not play the audio file 'text-audio-en.mp3'. Please make sure the audio file is in the folder.");
+      });
+    }
+
+    speechAudio.onended = () => {
+      isSpeechPlaying = false;
+      if (speechBtn) speechBtn.innerText = '🎧 Listen to Audio';
+    };
+  }
+
+  renderQuiz();
+  startMusic();
+</script>
+
+</body>
+</html>
