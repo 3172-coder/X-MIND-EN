@@ -450,8 +450,8 @@
 <script>
   // --- LANGUAGE SELECTOR LINKS ---
   const languageLinks = {
-    ru: "https://3172-coder.github.io/DQ-RU/",
-    en: "https://3172-coder.github.io/DQ-EN/"
+    ru: "index.html",
+    en: "index_en.html"
   };
 
   function openLanguageLink(selectElement) {
@@ -884,10 +884,12 @@
     selectedAnswers = {};
     isCheckedState = {};
     
-    // Stop voice-over on restart
+    // Stop voice-over on restart safely
     const speechAudio = document.getElementById('text-speech-audio');
-    speechAudio.pause();
-    speechAudio.currentTime = 0;
+    if (speechAudio) {
+      speechAudio.pause();
+      speechAudio.currentTime = 0;
+    }
     isSpeechPlaying = false;
 
     renderQuiz();
@@ -937,6 +939,8 @@
     const speechAudio = document.getElementById('text-speech-audio');
     const speechBtn = document.getElementById('speech-toggle-btn');
 
+    if (!speechAudio) return;
+
     if (isSpeechPlaying) {
       speechAudio.pause();
       isSpeechPlaying = false;
@@ -946,7 +950,7 @@
         isSpeechPlaying = true;
         if (speechBtn) speechBtn.innerText = '⏸ Pause Audio';
       }).catch(err => {
-        alert("Could not play the audio file 'text-audio-en.mp3'. Please make sure the audio file is in the folder.");
+        console.warn("Audio file could not be played:", err);
       });
     }
 
